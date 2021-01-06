@@ -42,6 +42,7 @@
 #define RAD2DEG(x) ((x)*180./M_PI)
 
 std::unordered_map<int,float> map;
+bool map_filled = false;
 
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
@@ -51,19 +52,38 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   
     for(int i = 0; i < count; i++) {
         float degree = RAD2DEG(scan->angle_min + scan->angle_increment * i);
-        ROS_INFO("[%f, %f]", degree, scan->ranges[i]);
+        float range = scan->ranges[i];
+        ROS_INFO("[%f, %f]", degree, range);
 
-        // int to float
+        /* Update MAP */
+
         int deg = (int)degree;
-        auto got = map.find(deg);
-        if (got == map.end()) {
-            // not found
-            std::pair<int,float> data (deg,scan->ranges[i]);
-            map.insert(data);
-        }
+
+        if (map_filled)
+            map[deg] = range;
         else {
-            got->second = scan->ranges[i];
+            auto got = map.find(deg); // to prevent duplicates
+            if (got == map.end()) {
+                std::pair<int,float> data (deg, range);
+                map.insert(data);
+            }
+            else 
+                map[deg] = range;
+            if (map.size() == 360) // FIXME
+                map_filled = true;
         }
+
+        /* DIRECTION */
+
+        if (map[0] > 2)
+            continue; // we keep going straight
+        else {
+            if (map[45] < map[315])
+                continue; // turn left
+            else
+                continue; // turn right
+        }
+
 
     }
 }
